@@ -1,16 +1,19 @@
 package main
 
-import "fmt"
-import "net"
-import "net/http"
-import "os"
-import "os/exec"
-import "strings"
-import "strconv"
+import (
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+	"syscall"
 
-import "github.com/kr/pty"
-import "github.com/creack/goterm/win"
-import "gopkg.in/alecthomas/kingpin.v2"
+	"github.com/alecthomas/kingpin/v2"
+	"github.com/creack/goterm/win"
+	"github.com/kr/pty"
+)
 
 func setPtySize(ptym *os.File, size string) {
 	sizeArr := strings.Split(size, "x")
@@ -26,6 +29,10 @@ func start() (*os.File, *exec.Cmd) {
 
 	cmdString := "/bin/bash"
 	cmd := exec.Command(cmdString)
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setsid:  true,
+		Setctty: false,
+	}
 	ptym, err := pty.Start(cmd)
 	if err != nil {
 		fmt.Println("failed to start command: ", err)
@@ -39,7 +46,6 @@ func stop(ptym *os.File, cmd *exec.Cmd) {
 	cmd.Wait()
 }
 
-
 func main() {
 	protocolFlag := kingpin.Flag("protocol", "specify websocket or tcp").Short('p').Default("websocket").String()
 	addrFlag := kingpin.Flag("addr", "IP:PORT or :PORT address to listen on").Short('a').Default(":0").String()
@@ -48,6 +54,9 @@ func main() {
 	kingpin.Parse()
 
 	if *protocolFlag == "websocket" {
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "index.html")
+		})
 		http.HandleFunc("/pty", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("client connected.")
 			ptyHandlerWs(w, r, *sizeFlag)
@@ -68,29 +77,29 @@ func main() {
 	} else {
 		addr, err := net.ResolveTCPAddr("tcp", *addrFlag)
 		if err != nil {
-	        fmt.Println("resolve error", err)
-	        return
-	    }
+			fmt.Println("resolve error", err)
+			return
+		}
 
 		listener, err := net.ListenTCP("tcp", addr)
-	    if err != nil {
-	        fmt.Println("listen error", err)
-	        return
-	    }
+		if err != nil {
+			fmt.Println("listen error", err)
+			return
+		}
 
 		_, port, _ := net.SplitHostPort(listener.Addr().String())
 		fmt.Println("listening on port:", port)
 
-	    for {
-	        conn, err := listener.AcceptTCP()
-	        if err != nil {
-	            fmt.Println("accept error", err)
-	            return
-	        }
+		for {
+			conn, err := listener.AcceptTCP()
+			if err != nil {
+				fmt.Println("accept error", err)
+				return
+			}
 
-	        fmt.Println("client connected.")
+			fmt.Println("client connected.")
 
-	        go ptySetupSock(conn, *sizeFlag)
-	    }
+			go ptySetupSock(conn, *sizeFlag)
+		}
 	}
 }

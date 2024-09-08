@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="
+https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js
+"></script>
+    <link href="
+https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css
+" rel="stylesheet">
+</head>
+
+<body>
+    <div id="terminal">
+    </div>
+    <script>
+        var term = new Terminal(
+            {
+                // logLevel: "debug",
+                disableStdin: false,
+                cursorBlink: "block",
+                cursorStyle: "underline",
+                fontSize: 12,
+                fontFamily: "monospace",
+                theme: {
+                    background: "#fff",
+                    foreground: "#000",
+                },
+            }
+        );
+       
+        const ws = new WebSocket("http://localhost:9990/pty");
+
+        ws.onopen = function () {
+            console.log("Connected");
+            ws.binaryType = 'blob';
+
+            term.open(document.getElementById('terminal'));
+        };
+
+        function send(text) {
+            const obj = `${text}\n`;
+            const blob = new Blob([obj], {
+                type: "plain/text",
+            });
+            ws.send(blob);
+        };
+        ws.addEventListener("message", event => {
+            event.data.text().then(txt=>term.write(txt))
+        });
+
+        let buff = "";
+
+        term.onData((data) => {
+            term.write(data);
+        });
+        
+        term.onKey((key,ev) => {
+            if (key.domEvent.key == "Enter") {
+                term.write('\n');
+                send(buff);
+                buff = [];
+                return;
+            }
+            if (key.domEvent.key == "Backspace") {
+                if(buff.length == 0) return true;
+                buff = buff.slice(0, -1);
+                term.write('\b \b');
+                return true;
+            }
+            buff += key.key;
+        });
+
+    </script>
+</body>
+
+</html>

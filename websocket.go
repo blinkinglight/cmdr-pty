@@ -1,12 +1,14 @@
 package main
 
-import "io"
-import "fmt"
-import "net/http"
-import "os"
-import "unicode/utf8"
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"unicode/utf8"
 
-import "github.com/gorilla/websocket"
+	"github.com/gorilla/websocket"
+)
 
 // Copy everything from the pty master to the websocket.
 func handleOutputWs(ptym *os.File, conn *websocket.Conn) {
@@ -73,8 +75,8 @@ func handleInputWs(ptym *os.File, conn *websocket.Conn) {
 
 func ptyHandlerWs(w http.ResponseWriter, r *http.Request, sizeFlag string) {
 	var upgrader = websocket.Upgrader{
-		ReadBufferSize:  1,
-		WriteBufferSize: 1,
+		ReadBufferSize:  10,
+		WriteBufferSize: 10,
 		CheckOrigin: func(r *http.Request) bool {
 			return true
 		},
